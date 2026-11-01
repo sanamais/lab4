@@ -18,6 +18,35 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
   process.exit(1);
 }
 
+function toNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function parseNdjson(text) {
+  const records = [];
+  for (const line of text.split('\n')) {
+    if (line.trim() === '') continue;
+    records.push(JSON.parse(line)); 
+  }
+  return records;
+}
+
+function buildResult(records) {
+  const result = [];
+  for (const r of records) {
+    result.push({
+      air_time: toNumber(r.AIR_TIME),
+      distance: toNumber(r.DISTANCE),
+    });
+  }
+  return { status: 200, body: result };
+}
+
 function send(res, status, body) {
   const json = JSON.stringify(body);
   res.writeHead(status, {
@@ -28,11 +57,29 @@ function send(res, status, body) {
 }
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, 'http://localhost');
-  if (url.pathname !== '/') {
-    return send(res, 404, { error: 'Маршрут не знайдено' });
+  try {
+    const url = new URL(req.url, 'http://localhost');
+    if (url.pathname !== '/') {
+      return send(res, 404, { error: 'Маршрут не знайдено' });
+    }
+    fs.readFile(input, 'utf8', (err, text) => {
+      if (err) {
+        console.error('Помилка читання:', err.message);
+        return send(res, 500, { error: 'Файл даних відсутній або недоступний' });
+      }
+      try {
+        const records = parseNdjson(text);
+        const { status, body } = buildResult(records);
+        send(res, status, body);
+      } catch (e) {
+        console.error('Помилка обробки:', e.message);
+        send(res, 500, { error: 'Файл даних пошкоджений' });
+      }
+    });
+  } catch (e) {
+    console.error('Неочікувана помилка:', e.message);
+    send(res, 500, { error: 'Внутрішня помилка сервера' });
   }
-  send(res, 200, { message: 'Сервер працює' });
 });
 
 server.on('error', (e) => {
