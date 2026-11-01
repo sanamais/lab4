@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { Command } from 'commander';
 
 const program = new Command();
@@ -15,3 +16,11 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
   console.error('Invalid port: expected integer 0-65535');
   process.exit(1);
 }
+
+fs.access(input, fs.constants.F_OK, (err) => {
+  if (err) {
+    console.error('Cannot find input file');
+    process.exit(1);
+  }
+  console.log('Файл знайдено (сервер ще не створено)');
+});
