@@ -59,11 +59,21 @@ function buildResult(records, params) {
 
 function send(res, status, body) {
   const json = JSON.stringify(body);
-  res.writeHead(status, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Content-Length': Buffer.byteLength(json),
+  const reply = (code, text) => {
+    res.writeHead(code, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Length': Buffer.byteLength(text),
+    });
+    res.end(text);
+  };
+  if (!output) return reply(status, json);
+  fs.writeFile(output, json, (err) => {
+    if (err) {
+      console.error('Помилка запису:', err.message);
+      return reply(500, JSON.stringify({ error: 'Не вдалося записати файл результату' }));
+    }
+    reply(status, json);
   });
-  res.end(json);
 }
 
 const server = http.createServer((req, res) => {
