@@ -36,13 +36,23 @@ function parseNdjson(text) {
   return records;
 }
 
-function buildResult(records) {
+function buildResult(records, params) {
+  const showDate = params.get('date') === 'true';
+  let min = null;
+  if (params.has('airtime_min')) {
+    min = toNumber(params.get('airtime_min'));
+    if (min === null) return { status: 400, body: { error: 'Параметр airtime_min має бути числом' } };
+  }
+
   const result = [];
   for (const r of records) {
-    result.push({
-      air_time: toNumber(r.AIR_TIME),
-      distance: toNumber(r.DISTANCE),
-    });
+    const airTime = toNumber(r.AIR_TIME);
+    if (min !== null && (airTime === null || !(airTime > min))) continue;
+    const item = {};
+    if (showDate) item.date = r.FL_DATE ?? null;
+    item.air_time = airTime;
+    item.distance = toNumber(r.DISTANCE);
+    result.push(item);
   }
   return { status: 200, body: result };
 }
@@ -69,7 +79,7 @@ const server = http.createServer((req, res) => {
       }
       try {
         const records = parseNdjson(text);
-        const { status, body } = buildResult(records);
+        const { status, body } = buildResult(records, url.searchParams);
         send(res, status, body);
       } catch (e) {
         console.error('Помилка обробки:', e.message);
